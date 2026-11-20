@@ -51,3 +51,6 @@ archives/
 .dev.vars
 .wrangler/
 .open-next/
+
+# Personal persona source (contains a real name); keep it local only
+zhj.txt
