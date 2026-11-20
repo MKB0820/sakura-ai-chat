@@ -1,0 +1,67 @@
+// Provider-agnostic design: to switch to Postgres later, change `provider`
+// to "postgresql" and swap the adapter in `lib/db.ts` / `prisma.config.ts`.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id            String         @id @default(cuid())
+  email         String         @unique
+  passwordHash  String
+  createdAt     DateTime       @default(now())
+  messages      Message[]
+  conversations Conversation[]
+}
+
+// A conversation owns its persona. Persona text is never stored in Message
+// rows, so clearing messages or trimming the context window cannot drop it.
+model Conversation {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String   @default("新对话")
+  personaId String   @default("default")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Local archive settings. Disabling stops writes but keeps existing files.
+  archiveEnabled  Boolean @default(false)
+  autoRead        Boolean @default(false)
+  archivedTurns   Int     @default(0)
+  lastInjectTurn  Int     @default(0)
+  needsArchiveRead Boolean @default(false)
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@index([userId, updatedAt])
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  userId         String
+  conversationId String
+  role           String
+  content        String
+  // Token usage reported by the provider for assistant replies; null for user
+  // messages and for replies streamed before this field existed.
+  inputTokens    Int?
+  outputTokens   Int?
+  createdAt      DateTime @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([conversationId, createdAt])
+}
+
+// Small key/value store for app settings (archive root, default switches).
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}

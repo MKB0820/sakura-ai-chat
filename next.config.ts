@@ -1,9 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
-  cacheComponents: true,
-  partialPrefetching: true,
+  // `cacheComponents` (Next 16 default) forbids route segment config such as
+  // `export const dynamic = 'force-dynamic'`, which the chat API and chat page
+  // require. Disabled so those directives take effect.
   turbopack: {
     rules: {
       "*.css": {
