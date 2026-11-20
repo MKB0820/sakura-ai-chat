@@ -18,7 +18,7 @@ npm run dev
 
 本地环境变量：
 
-- `.env.local`（Next 进程）：`AUTH_SECRET`、`DEEPSEEK_CONTEXT_TOKENS`、
+- `.env.local`（Next 进程）：`AUTH_SECRET`、`DEEPSEEK_CONTEXT_TOKENS`、`DEEPSEEK_MODEL`（默认 `deepseek-flash`）、
   以及加密后的 `DEEPSEEK_API_KEY_ENC`（见「API 密钥加密」）。`DATABASE_URL` 仅供可选的 Prisma CLI 使用，运行时不再读取。
 - `.dev.vars`（Wrangler 绑定，`npm run preview` / `wrangler dev` 用）：`AUTH_SECRET`、`DEEPSEEK_API_KEY`。
 
@@ -68,7 +68,7 @@ DeepSeek 密钥以 AES-256-GCM 密文保存在 `.env.local` 的 `DEEPSEEK_API_KE
 
 ## 人设与多对话
 
-- 每次新建对话都会弹出人设窗口，可选 6 种预设（温柔学姐、严谨工程师、幽默损友、古典诗人、耐心老师、效率管家），
+- 每次新建对话都会弹出人设窗口，可选 7 种预设（温柔学姐、严谨工程师、幽默损友、古典诗人、耐心老师、效率管家、zhj），
   或点「使用默认人设」不添加任何额外设定。
 - 人设保存在 `Conversation.personaId`，每次请求由服务端拼接到 `system` 提示词，与基础系统提示词同级。
   它不在消息列表里，所以「清除上下文」和 20 条上下文裁剪都不会移除或压缩它。

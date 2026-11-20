@@ -45,7 +45,7 @@ const server = http.createServer((req, res) => {
       id,
       object: 'chat.completion.chunk',
       created: Math.floor(Date.now() / 1000),
-      model: 'deepseek-chat',
+      model: payload.model ?? 'deepseek-flash',
       choices: [{ index: 0, delta: { role: 'assistant', content: '' }, finish_reason: null }],
     })
     for (const ch of [...REPLY]) {
@@ -54,7 +54,7 @@ const server = http.createServer((req, res) => {
         id,
         object: 'chat.completion.chunk',
         created: Math.floor(Date.now() / 1000),
-        model: 'deepseek-chat',
+        model: payload.model ?? 'deepseek-flash',
         choices: [{ index: 0, delta: { content: ch }, finish_reason: null }],
       })
     }
@@ -62,7 +62,7 @@ const server = http.createServer((req, res) => {
       id,
       object: 'chat.completion.chunk',
       created: Math.floor(Date.now() / 1000),
-      model: 'deepseek-chat',
+      model: payload.model ?? 'deepseek-flash',
       choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
       usage: { prompt_tokens: 10, completion_tokens: 30, total_tokens: 40 },
     })
