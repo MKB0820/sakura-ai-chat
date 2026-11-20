@@ -6,17 +6,23 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
+    "lint": "eslint",
+    "secret:status": "node tools/secret.mjs status",
+    "secret:migrate": "node tools/secret.mjs migrate",
+    "secret:set": "node tools/secret.mjs set"
   },
   "dependencies": {
     "@ai-sdk/deepseek": "^3.0.88",
     "@ai-sdk/react": "^4.0.180",
     "@base-ui/react": "^1.9.0",
-    "@node-rs/argon2": "^2.2.2",
-    "@prisma/adapter-better-sqlite3": "^7.10.1",
+    "@noble/hashes": "^2.4.0",
+    "@opennextjs/cloudflare": "^1.20.18",
+    "@prisma/adapter-d1": "^7.10.1",
     "@prisma/client": "^7.10.1",
     "ai": "^7.0.176",
-    "better-sqlite3": "^13.2.0",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.5.2",
     "lucide-react": "^1.75.0",
@@ -39,6 +45,7 @@
     "eslint-config-next": "16.4.6",
     "prisma": "^7.10.1",
     "tailwindcss": "4.3.3",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wrangler": "^4.165.0"
   }
 }

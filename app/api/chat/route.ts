@@ -12,7 +12,8 @@ import type { ChatMessage } from '@/lib/chat-types'
 import { buildSystemPrompt } from '@/lib/personas'
 import { MAX_CONTEXT_MESSAGES } from '@/lib/usage'
 import { getChatModelId, getContextWindowTokens } from '@/lib/config'
-import { ARCHIVE_INJECT_EVERY_TURNS, buildArchiveDigest } from '@/lib/archive'
+import { getDeepSeekApiKey } from '@/lib/secret'
+import { ARCHIVE_INJECT_EVERY_TURNS, buildArchiveDigest, isArchiveSupported } from '@/lib/archive'
 
 export const dynamic = 'force-dynamic'
 
@@ -87,7 +88,7 @@ export async function POST(request: Request) {
     conversation.autoRead &&
     conversation.archivedTurns - conversation.lastInjectTurn >= ARCHIVE_INJECT_EVERY_TURNS
 
-  if (conversation.archiveEnabled && (manualRead || periodicRead)) {
+  if (isArchiveSupported() && conversation.archiveEnabled && (manualRead || periodicRead)) {
     try {
       const digest = await buildArchiveDigest(
         conversation.id,
@@ -113,8 +114,20 @@ export async function POST(request: Request) {
     buildSystemPrompt(conversation.personaId) +
     (archiveDigest ? `\n\n${archiveDigest}` : '')
 
+  // Decrypted on demand; the plaintext key never leaves the server process.
+  let apiKey: string | undefined
+  try {
+    apiKey = await getDeepSeekApiKey()
+  } catch (error) {
+    console.error('[secret] decrypt failed:', error instanceof Error ? error.message : error)
+    return Response.json(
+      { error: '服务端密钥解密失败，请重新设置 API 密钥。' },
+      { status: 500 },
+    )
+  }
+
   const deepseek = createDeepSeek({
-    apiKey: process.env.DEEPSEEK_API_KEY,
+    apiKey,
     ...(process.env.DEEPSEEK_BASE_URL ? { baseURL: process.env.DEEPSEEK_BASE_URL } : {}),
   })
 
@@ -151,7 +164,11 @@ export async function POST(request: Request) {
         },
       }),
       headers: {
+        'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache, no-transform',
+        Connection: 'keep-alive',
+        // Cloudflare / reverse proxies: never buffer the stream.
+        'X-Accel-Buffering': 'no',
         'X-Vercel-CDN-Cache-Control': 'no-cache',
       },
     })

@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/db'
-import { appendToArchive } from '@/lib/archive'
+import { appendToArchive, isArchiveSupported } from '@/lib/archive'
 
 const bodySchema = z.object({
   role: z.enum(['user', 'assistant']),
@@ -85,7 +85,7 @@ export async function POST(
 
   // Mirror the message into the local archive. Best-effort: a disk failure
   // must not fail the chat itself.
-  if (conversation.archiveEnabled) {
+  if (conversation.archiveEnabled && isArchiveSupported()) {
     try {
       await appendToArchive({
         conversationId: conversation.id,
@@ -133,7 +133,7 @@ export async function DELETE(
   })
 
   // Clearing the context is one of the moments the archive reads back in.
-  if (conversation.archiveEnabled && conversation.autoRead) {
+  if (conversation.archiveEnabled && conversation.autoRead && isArchiveSupported()) {
     await prisma.conversation.update({
       where: { id: conversation.id },
       data: { needsArchiveRead: true },

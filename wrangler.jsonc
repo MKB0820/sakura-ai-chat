@@ -1,0 +1,27 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "sakura-ai-chat",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-11-20",
+  // Auth.js, Prisma and node:crypto need the Node.js compatibility layer.
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "sakura-ai-chat-db",
+      "database_id": "4e18e014-ca20-4888-b599-da647238fea4",
+      "migrations_dir": "d1-migrations"
+    }
+  ],
+  // Non-secret runtime configuration (model window for the usage meter).
+  "vars": {
+    "DEEPSEEK_CONTEXT_TOKENS": "1048576"
+  },
+  "observability": {
+    "enabled": true
+  }
+}

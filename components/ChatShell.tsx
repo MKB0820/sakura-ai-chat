@@ -17,10 +17,17 @@ export type ConversationSummary = {
 type Props = {
   userEmail: string
   conversations: ConversationSummary[]
+  /** Local file archives need a filesystem; disabled on Cloudflare Workers. */
+  archiveAvailable: boolean
   children: React.ReactNode
 }
 
-export default function ChatShell({ userEmail, conversations, children }: Props) {
+export default function ChatShell({
+  userEmail,
+  conversations,
+  archiveAvailable,
+  children,
+}: Props) {
   const pathname = usePathname()
   const router = useRouter()
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -72,16 +79,18 @@ export default function ChatShell({ userEmail, conversations, children }: Props)
         <span aria-hidden="true">＋</span> 新对话
       </button>
 
-      <button
-        type="button"
-        onClick={() => {
-          setMobileOpen(false)
-          setArchiveOpen(true)
-        }}
-        className="flex w-full items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-      >
-        <span aria-hidden="true">🗂</span> 存档管理
-      </button>
+      {archiveAvailable ? (
+        <button
+          type="button"
+          onClick={() => {
+            setMobileOpen(false)
+            setArchiveOpen(true)
+          }}
+          className="flex w-full items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+        >
+          <span aria-hidden="true">🗂</span> 存档管理
+        </button>
+      ) : null}
 
       <p className="px-1 pt-2 text-xs font-medium text-muted-foreground">对话记录</p>
 

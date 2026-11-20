@@ -1,13 +1,16 @@
 import NextAuth from 'next-auth'
 import Credentials from 'next-auth/providers/credentials'
+import { authConfig } from '@/auth.config'
 import { prisma } from '@/lib/db'
 import { verifyPassword } from '@/lib/password'
 import { loginSchema } from '@/lib/validation'
 
+/**
+ * Auth.js entry point. Runs in the Node.js runtime (and in Cloudflare Workers
+ * through nodejs_compat). The edge-safe options live in auth.config.ts.
+ */
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  trustHost: true,
-  session: { strategy: 'jwt' },
-  pages: { signIn: '/login' },
+  ...authConfig,
   providers: [
     Credentials({
       credentials: {
@@ -29,14 +32,4 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
     }),
   ],
-  callbacks: {
-    jwt({ token, user }) {
-      if (user?.id) token.id = user.id
-      return token
-    },
-    session({ session, token }) {
-      if (token.id) session.user.id = token.id as string
-      return session
-    },
-  },
 })

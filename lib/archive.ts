@@ -3,6 +3,7 @@ import type { Dirent } from 'node:fs'
 import path from 'node:path'
 import { prisma } from '@/lib/db'
 import { getPersona } from '@/lib/personas'
+import { isCloudflareWorkers } from '@/lib/runtime'
 
 /**
  * Local conversation archive: one folder per conversation with
@@ -14,7 +15,18 @@ import { getPersona } from '@/lib/personas'
  * break chatting, so callers wrap writes in try/catch.
  */
 
-export const DEFAULT_ARCHIVE_ROOT = path.join(process.cwd(), 'archives')
+/**
+ * The archive writes to the local filesystem, which Cloudflare Workers do not
+ * provide. Every entry point checks this and returns a clear error instead of
+ * failing silently.
+ */
+export function isArchiveSupported(): boolean {
+  return !isCloudflareWorkers()
+}
+
+function getDefaultArchiveRoot(): string {
+  return path.join(process.cwd(), 'archives')
+}
 
 /** A model-side archive digest is injected every this many archived turns. */
 export const ARCHIVE_INJECT_EVERY_TURNS = 20
@@ -55,10 +67,12 @@ export type ArchiveMeta = {
 
 export async function getArchiveRoot(): Promise<string> {
   const row = await prisma.setting.findUnique({ where: { key: KEY_ROOT } })
-  return row?.value?.trim() || DEFAULT_ARCHIVE_ROOT
+  return row?.value?.trim() || getDefaultArchiveRoot()
 }
 
 export async function getArchiveDefaultOn(): Promise<boolean> {
+  // No filesystem on Workers, so new conversations must not enable archiving.
+  if (!isArchiveSupported()) return false
   const row = await prisma.setting.findUnique({ where: { key: KEY_DEFAULT_ON } })
   return row ? row.value === 'true' : true
 }

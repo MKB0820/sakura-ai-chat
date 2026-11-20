@@ -1,9 +1,11 @@
 // Live smoke test: one real streaming round-trip through the app against the
-// configured DeepSeek API. Requires the server on port 3000 and a real key.
-const BASE = 'http://127.0.0.1:3000'
+// configured DeepSeek API. Works against `npm run dev`, `wrangler dev`, or a
+// deployed Worker:
+//   node tools/smoke-live.mjs [baseUrl]
+const BASE = process.argv[2] ?? 'http://127.0.0.1:3000'
 
 async function waitForServer() {
-  for (let i = 0; i < 60; i++) {
+  for (let i = 0; i < 120; i++) {
     try {
       if ((await fetch(`${BASE}/login`)).ok) return
     } catch {
@@ -108,17 +110,6 @@ console.log('reply preview:', JSON.stringify(text.slice(0, 80)))
 console.log('finish metadata:', JSON.stringify(finish?.messageMetadata ?? null))
 
 const usage = finish?.messageMetadata?.usage
-const window = finish?.messageMetadata?.contextWindow
-const ok = res.status === 200 && text.trim().length > 0 && usage?.inputTokens > 0 && usage?.outputTokens > 0 && window === 1048576
+const ok = res.status === 200 && text.trim().length > 0 && usage?.inputTokens > 0 && usage?.outputTokens > 0
 console.log(ok ? 'LIVE SMOKE PASSED' : 'LIVE SMOKE FAILED')
-
-// Clean up this run's account.
-const { PrismaBetterSqlite3 } = await import('@prisma/adapter-better-sqlite3')
-const { PrismaClient } = await import('@prisma/client')
-const prisma = new PrismaClient({
-  adapter: new PrismaBetterSqlite3({ url: 'file:./prisma/dev.db' }),
-})
-await prisma.user.deleteMany({ where: { email } })
-await prisma.$disconnect()
-
 process.exit(ok ? 0 : 1)

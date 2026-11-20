@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/db'
+import { isArchiveSupported } from '@/lib/archive'
 import ChatShell from '@/components/ChatShell'
 
 export const dynamic = 'force-dynamic'
@@ -19,7 +20,11 @@ export default async function ChatLayout({
   })
 
   return (
-    <ChatShell userEmail={session.user.email} conversations={conversations}>
+    <ChatShell
+      userEmail={session.user.email}
+      conversations={conversations}
+      archiveAvailable={isArchiveSupported()}
+    >
       {children}
     </ChatShell>
   )

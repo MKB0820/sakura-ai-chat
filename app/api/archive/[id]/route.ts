@@ -1,7 +1,13 @@
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/db'
-import { archiveHasFiles, deleteArchive, rebuildArchive } from '@/lib/archive'
+import { archiveHasFiles, deleteArchive, isArchiveSupported, rebuildArchive } from '@/lib/archive'
+
+const UNSUPPORTED = () =>
+  Response.json(
+    { error: '当前运行环境（Cloudflare Workers）不支持本地文件存档。', unsupported: true },
+    { status: 501 },
+  )
 
 export const dynamic = 'force-dynamic'
 
@@ -22,6 +28,8 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  if (!isArchiveSupported()) return UNSUPPORTED()
+
   const session = await auth()
   if (!session?.user?.id) {
     return Response.json({ error: '未登录。' }, { status: 401 })
@@ -69,6 +77,8 @@ export async function POST(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  if (!isArchiveSupported()) return UNSUPPORTED()
+
   const session = await auth()
   if (!session?.user?.id) {
     return Response.json({ error: '未登录。' }, { status: 401 })
@@ -96,6 +106,8 @@ export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  if (!isArchiveSupported()) return UNSUPPORTED()
+
   const session = await auth()
   if (!session?.user?.id) {
     return Response.json({ error: '未登录。' }, { status: 401 })

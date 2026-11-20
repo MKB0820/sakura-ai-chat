@@ -46,3 +46,8 @@ prisma/dev.db*
 
 # local conversation archives
 archives/
+
+# wrangler local secrets
+.dev.vars
+.wrangler/
+.open-next/

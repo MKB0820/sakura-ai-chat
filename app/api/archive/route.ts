@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { promises as fs } from 'node:fs'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/db'
+import { isArchiveSupported } from '@/lib/archive'
 import {
   archiveHasFiles,
   getArchiveDefaultOn,
@@ -12,6 +13,12 @@ import {
   setArchiveRoot,
 } from '@/lib/archive'
 
+const UNSUPPORTED = () =>
+  Response.json(
+    { error: '当前运行环境（Cloudflare Workers）不支持本地文件存档。', unsupported: true },
+    { status: 501 },
+  )
+
 export const dynamic = 'force-dynamic'
 
 const settingsSchema = z.object({
@@ -21,6 +28,8 @@ const settingsSchema = z.object({
 })
 
 export async function GET() {
+  if (!isArchiveSupported()) return UNSUPPORTED()
+
   const session = await auth()
   if (!session?.user?.id) {
     return Response.json({ error: '未登录。' }, { status: 401 })
@@ -64,6 +73,8 @@ export async function GET() {
 }
 
 export async function PATCH(request: Request) {
+  if (!isArchiveSupported()) return UNSUPPORTED()
+
   const session = await auth()
   if (!session?.user?.id) {
     return Response.json({ error: '未登录。' }, { status: 401 })
