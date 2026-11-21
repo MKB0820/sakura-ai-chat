@@ -49,8 +49,11 @@ node tools/verify-cloudflare.mjs https://<worker>.workers.dev
 - Prisma 只通过 D1 binding（`env.DB`）访问，没有 `DATABASE_URL` 连接字符串；
   Client 在请求内惰性实例化，不在模块顶层创建。
 - 密码哈希使用 `@noble/hashes` 的纯 JS Argon2id（`@node-rs/argon2` 的原生模块在 Workers 无法加载），
-  参数仍是 m=19456、t=2、p=1，旧哈希可直接验证。纯 JS 哈希每次约 0.3–1 秒 CPU，
-  Workers 免费计划的 CPU 限额可能不够，建议 Workers Paid。
+  参数仍是 m=19456、t=2、p=1，旧哈希可直接验证。
+- **哈希在 Durable Object 中执行**：Workers 免费计划每次请求只有 10ms CPU，而 Argon2 约需 250ms；
+  Durable Object `AuthHasher` 在免费计划也可用且每次调用有 30s CPU。主 Worker 只做一次 RPC，
+  因此免费计划也能稳定注册和登录。`wrangler.jsonc` 中对应 `durable_objects` 与
+  `new_sqlite_classes` 迁移；`worker/entry.ts` 在 OpenNext 生成的 Worker 上挂载这个类。
 - 本地文件存档依赖文件系统，在 Workers 上不可用：侧栏会隐藏「存档管理」，相关 API 返回 501 并说明原因；
   D1 对话持久化不受影响。
 
@@ -104,7 +107,8 @@ archives/<conversationId>/
 - `app/api/auth/register` 注册
 - `auth.config.ts` Edge 安全的 Auth.js 选项；`lib/auth.ts` 注入 Credentials provider
 - `lib/db.ts` Prisma D1 适配器与请求内惰性客户端
-- `lib/password.ts` 纯 JS Argon2id（@noble/hashes），兼容旧哈希
+- `lib/password-core.ts` 纯 JS Argon2id（@noble/hashes）；`lib/password.ts` 在 Workers 上走 Durable Object，本地走纯 JS
+- `worker/entry.ts` / `worker/auth-hasher.ts` Worker 入口包装与 Argon2 Durable Object
 - `lib/personas.ts` 人设预设与系统提示词拼装
 - `lib/usage.ts` 上下文窗口常量、token 估算与格式化
 - `lib/archive.ts` 本地存档读写（Workers 上禁用）

@@ -1,96 +1,68 @@
-import { argon2idAsync } from '@noble/hashes/argon2.js'
+import { getCloudflareContext } from '@opennextjs/cloudflare'
+import { hashPasswordLocal, verifyPasswordLocal } from '@/lib/password-core'
+import { isCloudflareWorkers } from '@/lib/runtime'
 
 /**
- * Argon2id password hashing that runs on Cloudflare Workers.
+ * Password hashing entry point.
  *
- * `@node-rs/argon2` ships a native `.node` binary, which Workers cannot load.
- * `@noble/hashes` is a pure-JS Argon2id implementation; the parameters below
- * match what the app used before (m=19456 KiB, t=2, p=1, 32-byte output), and
- * existing PHC strings verify unchanged.
+ * On Cloudflare Workers the Argon2 work runs inside a Durable Object
+ * (`AuthHasher`), because the Workers Free plan caps normal invocations at
+ * 10 ms of CPU while a Durable Object gets 30 s. The main Worker only pays for
+ * one RPC round-trip. On Node.js (`next dev`) the same Argon2id code runs
+ * locally.
+ *
+ * The hash format and parameters are unchanged, so existing hashes verify.
  */
 
-const PARAMS = { t: 2, m: 19456, p: 1, dkLen: 32 } as const
-const PHC_PREFIX = '$argon2id$v=19'
-
-type ParsedHash = {
-  m: number
-  t: number
-  p: number
-  salt: Uint8Array
-  hash: Uint8Array
+type AuthHasherStub = {
+  hash(password: string): Promise<string>
+  verify(storedHash: string | null, password: string): Promise<boolean>
 }
 
-function decodeBase64(value: string): Uint8Array {
-  const binary = atob(value)
-  const bytes = new Uint8Array(binary.length)
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
-  return bytes
-}
-
-function encodeBase64(bytes: Uint8Array): string {
-  let binary = ''
-  for (const byte of bytes) binary += String.fromCharCode(byte)
-  return btoa(binary).replace(/=+$/, '')
-}
-
-function parsePhc(stored: string): ParsedHash | null {
-  const parts = stored.trim().split('$')
-  // ['', 'argon2id', 'v=19', 'm=19456,t=2,p=1', salt, hash]
-  if (parts.length !== 6 || parts[1] !== 'argon2id' || parts[2] !== 'v=19') return null
-
-  const params: Record<string, number> = {}
-  for (const pair of parts[3].split(',')) {
-    const [key, raw] = pair.split('=')
-    const value = Number(raw)
-    if (key && Number.isFinite(value)) params[key] = value
-  }
-  if (!params.m || !params.t || !params.p) return null
-
+function getHasher(): AuthHasherStub | null {
   try {
-    const salt = decodeBase64(parts[4])
-    const hash = decodeBase64(parts[5])
-    if (salt.length === 0 || hash.length === 0) return null
-    return { m: params.m, t: params.t, p: params.p, salt, hash }
+    const { env } = getCloudflareContext()
+    const namespace = (
+      env as unknown as {
+        AUTH_HASHER?: {
+          idFromName(name: string): unknown
+          get(id: unknown): AuthHasherStub
+        }
+      }
+    ).AUTH_HASHER
+    if (!namespace) return null
+    return namespace.get(namespace.idFromName('auth-hasher'))
   } catch {
     return null
   }
 }
 
-function constantTimeEqual(a: Uint8Array, b: Uint8Array): boolean {
-  if (a.length !== b.length) return false
-  let diff = 0
-  for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i]
-  return diff === 0
-}
-
 export async function hashPassword(password: string): Promise<string> {
-  const salt = crypto.getRandomValues(new Uint8Array(16))
-  const hash = await argon2idAsync(password, salt, PARAMS)
-  return `${PHC_PREFIX}$m=${PARAMS.m},t=${PARAMS.t},p=${PARAMS.p}$${encodeBase64(salt)}$${encodeBase64(hash)}`
+  if (isCloudflareWorkers()) {
+    const hasher = getHasher()
+    if (!hasher) {
+      throw new Error('AUTH_HASHER Durable Object binding is missing on Workers.')
+    }
+    return hasher.hash(password)
+  }
+  return hashPasswordLocal(password)
 }
 
 /**
- * Verifies a stored PHC hash. When the account does not exist the caller
- * passes null, and we still run a full derivation so response timing does not
- * reveal whether an email is registered.
+ * Verifies a stored PHC hash. A null hash still burns a real derivation inside
+ * the Durable Object (or locally), so timing does not reveal whether an email
+ * is registered.
  */
 export async function verifyPassword(
   storedHash: string | null | undefined,
   password: string,
 ): Promise<boolean> {
-  const parsed = storedHash ? parsePhc(storedHash) : null
-
-  if (!parsed) {
-    await argon2idAsync(password, new Uint8Array(16), PARAMS).catch(() => undefined)
-    return false
+  if (isCloudflareWorkers()) {
+    const hasher = getHasher()
+    if (!hasher) {
+      throw new Error('AUTH_HASHER Durable Object binding is missing on Workers.')
+    }
+    return hasher.verify(storedHash ?? null, password)
   }
-
-  const derived = await argon2idAsync(password, parsed.salt, {
-    t: parsed.t,
-    m: parsed.m,
-    p: parsed.p,
-    dkLen: parsed.hash.length,
-  }).catch(() => null)
-
-  return derived !== null && constantTimeEqual(derived, parsed.hash)
+  return verifyPasswordLocal(storedHash, password)
 }

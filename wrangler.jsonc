@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "sakura-ai-chat",
-  "main": ".open-next/worker.js",
+  "main": "worker/entry.ts",
   "compatibility_date": "2026-11-20",
   // Auth.js, Prisma and node:crypto need the Node.js compatibility layer.
   "compatibility_flags": ["nodejs_compat"],
@@ -9,6 +9,12 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
+  // Argon2 runs in this Durable Object: Workers Free caps normal invocations
+  // at 10ms CPU, while Durable Objects get 30s.
+  "durable_objects": {
+    "bindings": [{ "name": "AUTH_HASHER", "class_name": "AuthHasher" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["AuthHasher"] }],
   "d1_databases": [
     {
       "binding": "DB",

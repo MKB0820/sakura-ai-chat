@@ -63,7 +63,8 @@ async function login(email, password) {
     redirect: 'manual',
   })
   absorb(jar, res)
-  const hasSession = Object.keys(jar).some((k) => k.startsWith('authjs.session-token'))
+  // Auth.js uses __Secure-authjs.session-token on HTTPS.
+  const hasSession = Object.keys(jar).some((k) => k.includes('session-token'))
   return { jar, hasSession, status: res.status, ms: Date.now() - started }
 }
 
@@ -155,19 +156,23 @@ const created = await (await json(loginA.jar, '/api/conversations', 'POST', { pe
 const conversationId = created.id
 check('conversation created in D1', Boolean(conversationId), JSON.stringify(created))
 
-const stream = await streamChat(loginA.jar, conversationId, '用一句话介绍你自己。')
+const stream = await streamChat(
+  loginA.jar,
+  conversationId,
+  '请用大约 300 字介绍樱花，分几段写，最后用一句话总结。',
+)
 check('chat stream status 200', stream.status === 200, `status ${stream.status}`)
 check('SSE content-type', (stream.headers.contentType ?? '').includes('text/event-stream'), stream.headers.contentType)
-check('SSE no-buffering header', stream.headers.accelBuffering === 'no', String(stream.headers.accelBuffering))
+check('SSE no-transform cache policy', (stream.headers.cacheControl ?? '').includes('no-transform'), stream.headers.cacheControl)
 check('reply is non-empty', stream.reply.trim().length > 0, `${stream.reply.length} chars`)
 check('reply streams incrementally', stream.deltas > 3 && stream.firstDeltaMs !== null, `${stream.deltas} deltas, first at ${stream.firstDeltaMs}ms, total ${stream.ms}ms`)
-check('first delta arrives before completion', stream.firstDeltaMs !== null && stream.firstDeltaMs < Math.max(stream.ms - 300, 600), `first ${stream.firstDeltaMs}ms / total ${stream.ms}ms`)
+check('first delta arrives well before completion', stream.firstDeltaMs !== null && stream.firstDeltaMs < stream.ms - 500, `first ${stream.firstDeltaMs}ms / total ${stream.ms}ms`)
 check('usage metadata from provider', (stream.metadata?.usage?.inputTokens ?? 0) > 0, JSON.stringify(stream.metadata?.usage))
 
 // Persist the exchange the way the client does, then reload the page.
 await json(loginA.jar, `/api/conversations/${conversationId}/messages`, 'POST', {
   role: 'user',
-  content: '用一句话介绍你自己。',
+  content: '请用大约 300 字介绍樱花，分几段写，最后用一句话总结。',
 })
 await json(loginA.jar, `/api/conversations/${conversationId}/messages`, 'POST', {
   role: 'assistant',
@@ -178,7 +183,7 @@ await json(loginA.jar, `/api/conversations/${conversationId}/messages`, 'POST', 
 const page = await fetch(`${BASE}/chat/${conversationId}`, { headers: { Cookie: cookieHeader(loginA.jar) } })
 const html = await page.text()
 check('conversation page renders', page.status === 200)
-check('history persisted in D1 after reload', html.includes('用一句话介绍你自己'))
+check('history persisted in D1 after reload', html.includes('请用大约 300 字介绍樱花，分几段写，最后用一句话总结。'))
 check('usage persisted and rendered', html.includes('上次实测'))
 
 const list = await (await json(loginA.jar, '/api/conversations', 'GET')).json()
